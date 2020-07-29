@@ -38,7 +38,6 @@ if __name__ == '__main__':
 
     # DFT.時間かかるので一部のみを利用
     dt1 = DFT(wave1[10000:11024])
-    dt2 = DFT(wave2[10000:11024])
     
     # 周波数リストを作成
     # 標本化周波数をデータ数で分割 
@@ -49,11 +48,6 @@ if __name__ == '__main__':
     plt.subplot(2,1,1)
     plt.title('guitar_A4')
     plt.plot(frq,dt1)
-
-    # リコーダーA4
-    plt.subplot(2,1,2)
-    plt.title('recorder_A4')
-    plt.plot(frq,dt2)
 
     # グラフ表示
     plt.show()
