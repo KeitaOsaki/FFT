@@ -1,53 +1,87 @@
-import wave
+import cv2
 import numpy as np
-import cmath as cm
-import matplotlib.pyplot as plt
 
-def wave_load(filename):
-    # open wave file
-    wf = wave.open(filename,'r')
-    channels = wf.getnchannels() # 追記
-    print(wf.getparams())
+"""
+四隅に低周波数があるため、
+切り抜いた四隅を合成し、中央を低周波数にする
+"""
+def shift_dft(src, dst=None):
+    if dst is None:
+        dst = np.empty(src.shape, src.dtype)
+    elif src.shape != dst.shape:
+        raise ValueError("src and dst must have equal sizes")
+    elif src.dtype != dst.dtype:
+        raise TypeError("src and dst must have equal types")
 
-    # load wave data
-    chunk_size = wf.getnframes()
-    amp  = (2**8) ** wf.getsampwidth() / 2
-    data = wf.readframes(chunk_size)   # バイナリ読み込み
-    data = np.frombuffer(data,'int16') # intに変換
-    data = data / amp                  # 振幅正規化
+    if src is dst:
+        ret = np.empty(src.shape, src.dtype)
+    else:
+        ret = dst
 
-    return data
+    h, w = src.shape[:2]
 
+    cx1 = cx2 = w/2
+    cy1 = cy2 = h/2
 
-def DFT(data):
-    res = []
-    N = len(data)
-    for k in range(N): #各周波数に関して
-        w = cm.exp(-1j * 2 * cm.pi * k / float(N))
-        X_k = 0
-        for n in range(N): #信号*重みの総和をとる
-            X_k += data[n] * (w ** n)
-        res.append(abs(X_k))
-    return res
+    # 
+    if w % 2 != 0:
+        cx2 += 1
+    if h % 2 != 0:
+        cy2 += 1
 
-if __name__ == '__main__':
-    # 波形データ読み込み
-    fs = 8000
-    wave1 = wave_load('guitar_A4.wav')
-    wave2 = wave_load('recorder_A4.wav')
+    # 左上と右下の入れ替え
+    ret[h-cy1:, w-cx1:] = src[0:cy1 , 0:cx1 ]   # 左上を右下に
+    ret[0:cy2 , 0:cx2 ] = src[h-cy2:, w-cx2:]   # 右下を右上に
+    # 左下と右上の入れ替え
+    ret[0:cy2 , w-cx2:] = src[h-cy2:, 0:cx2 ]   # 左下を右上に
+    ret[h-cy1:, 0:cx1 ] = src[0:cy1 , w-cx1:]   # 右上を左下に
 
-    # DFT.時間かかるので一部のみを利用
-    dt1 = DFT(wave1[10000:11024])
+    if src is dst:
+        dst[:,:] = ret
+
+    return dst
+
+if __name__ == "__main__":
+    im = cv2.imread('keita.jpg')
+
+    # グレースケール変換
+    im2 = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    h, w = im2.shape[:2]
+
+    realInput = im2.astype(np.float64)
+
+    # DFT変換のサイズを計算
+    dft_M = cv2.getOptimalDFTSize(w)
+    dft_N = cv2.getOptimalDFTSize(h)
+
+    # Aをdft_Aにコピーし、 pad dft_Aはゼロ
+    dft_A = np.zeros((dft_N, dft_M, 2), dtype=np.float64)
+    dft_A[:h, :w, 0] = realInput
+
+    # no need to pad bottom part of dft_A with zeros because of
+    # use of nonzeroRows parameter in cv2.dft()
+    cv2.dft(dft_A, dst=dft_A, nonzeroRows=h)
+
+    cv2.imshow("win", im)
+
+    # 実数と虚数分解
+    image_Re, image_Im = cv2.split(dft_A)
+
+    # 二乗和して根を取り正にへ
+    magnitude = cv2.sqrt(image_Re**2.0 + image_Im**2.0)
+
+    # 対数を取る
+    log_spectrum = cv2.log(1.0 + magnitude)
+
+    # 四隅が低波数⇒中央が低波数になるよう組み換え
+    shift_dft(log_spectrum, log_spectrum)
+
+    # 正規化して可視化
+    cv2.normalize(log_spectrum, log_spectrum, 0.0, 1.0, cv2.NORM_MINMAX)
     
-    # 周波数リストを作成
-    # 標本化周波数をデータ数で分割 
-    frq = np.arange(1024) * fs / 1024
+    log_spectrum2=np.float32(log_spectrum)
 
-    # グラフ表示
-    # ギターA4
-    plt.subplot(2,1,1)
-    plt.title('guitar_A4')
-    plt.plot(frq,dt1)
+    cv2.imshow("magnitude", log_spectrum2)
 
-    # グラフ表示
-    plt.show()
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
