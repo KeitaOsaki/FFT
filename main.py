@@ -1,28 +1,22 @@
-
-	
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
  
-# 画像を読み込み、2Dフーリエ変換をする
-img = cv2.imread('nice_face.jpg', 0)           # 画像をグレースケールで読み込み
-f = np.fft.fft2(img)                        # 2Dフーリエ変換
-f_shift = np.fft.fftshift(f)                # 直流成分を画像中心に移動させるためN/2シフトさせる
-mag = 20 * np.log(np.abs(f_shift))          # 振幅成分を計算
+img = cv2.imread('keita.jpg', 0)           
+f = np.fft.fft2(img)                      #FFTを計算するための関数
+f_shift = np.fft.fftshift(f)                
+mag = 20 * np.log(np.abs(f_shift))          
  
-# 周波数領域にマスクをかける
-rows, cols = img.shape                      # 画像サイズを取得
-crow, ccol = int(rows / 2), int(cols / 2)   # 画像中心を計算
-mask = 30                                   # マスクのサイズ
+rows, cols = img.shape                      
+crow, ccol = int(rows / 2), int(cols / 2)  
+mask = 30                                 
 f_shift[crow-mask:crow+mask,
         ccol-mask:ccol+mask] = 0
  
-# 2D逆フーリエ変換によりフィルタリング後の画像を得る
-f_ishift = np.fft.ifftshift(f_shift)        # シフト分を元に戻す
-img_back = np.fft.ifft2(f_ishift)           # 逆フーリエ変換
-img_back = np.abs(img_back)                 # 実部を計算する
+f_ishift = np.fft.ifftshift(f_shift)      #直流成分の位置を画像の左上に
+img_back = np.fft.ifft2(f_ishift)         #逆フーリエ変換を適用
+img_back = np.abs(img_back)                
  
-# ここからグラフ表示
 fig = plt.figure(figsize=(10, 3))
 ax1 = fig.add_subplot(131)
 ax2 = fig.add_subplot(132)
