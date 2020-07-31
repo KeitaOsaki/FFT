@@ -1,49 +1,38 @@
-from PIL import Image
+
+	
+import cv2
 import numpy as np
 from matplotlib import pyplot as plt
-
-
-def main():
-    # 画像を読み込む
-    img = Image.open('keita.jpg')
-    # グレイスケールに変換する
-    gray_img = img.convert('L')
-    # NumPy 配列にする
-    f_xy = np.asarray(gray_img)
-
-    # 2 次元高速フーリエ変換で周波数領域の情報を取り出す
-    f_uv = np.fft.fft2(f_xy)
-    # 画像の中心に低周波数の成分がくるように並べかえる
-    shifted_f_uv = np.fft.fftshift(f_uv)
-
-    # パワースペクトルに変換する
-    magnitude_spectrum2d = 20 * np.log(np.absolute(shifted_f_uv))
-
-    # 元の並びに直す
-    unshifted_f_uv = np.fft.fftshift(shifted_f_uv)
-    # 2 次元逆高速フーリエ変換で空間領域の情報に戻す
-    i_f_xy = np.fft.ifft2(unshifted_f_uv).real  # 実数部だけ使う
-
-    # 上記を画像として可視化する
-    fig, axes = plt.subplots(1, 3, figsize=(8, 4))
-    # 枠線と目盛りを消す
-    for ax in axes:
-        for spine in ax.spines.values():
-            spine.set_visible(False)
-        ax.set_xticks([])
-        ax.set_yticks([])
-    # 元画像
-    axes[0].imshow(f_xy, cmap='gray')
-    axes[0].set_title('Input Image')
-    # 周波数領域のパワースペクトル
-    axes[1].imshow(magnitude_spectrum2d, cmap='gray')
-    axes[1].set_title('Magnitude Spectrum')
-    # FFT -> IFFT した画像
-    axes[2].imshow(i_f_xy, cmap='gray')
-    axes[2].set_title('Reversed Image')
-    # グラフを表示する
-    plt.show()
-
-
-if __name__ == '__main__':
-    main()
+ 
+# 画像を読み込み、2Dフーリエ変換をする
+img = cv2.imread('nice_face.jpg', 0)           # 画像をグレースケールで読み込み
+f = np.fft.fft2(img)                        # 2Dフーリエ変換
+f_shift = np.fft.fftshift(f)                # 直流成分を画像中心に移動させるためN/2シフトさせる
+mag = 20 * np.log(np.abs(f_shift))          # 振幅成分を計算
+ 
+# 周波数領域にマスクをかける
+rows, cols = img.shape                      # 画像サイズを取得
+crow, ccol = int(rows / 2), int(cols / 2)   # 画像中心を計算
+mask = 30                                   # マスクのサイズ
+f_shift[crow-mask:crow+mask,
+        ccol-mask:ccol+mask] = 0
+ 
+# 2D逆フーリエ変換によりフィルタリング後の画像を得る
+f_ishift = np.fft.ifftshift(f_shift)        # シフト分を元に戻す
+img_back = np.fft.ifft2(f_ishift)           # 逆フーリエ変換
+img_back = np.abs(img_back)                 # 実部を計算する
+ 
+# ここからグラフ表示
+fig = plt.figure(figsize=(10, 3))
+ax1 = fig.add_subplot(131)
+ax2 = fig.add_subplot(132)
+ax3 = fig.add_subplot(133)
+ax1.imshow(img, cmap='gray')
+ax2.imshow(mag, cmap='gray')
+ax3.imshow(img_back, cmap='gray')
+ax1.axis('off')
+ax2.axis('off')
+ax3.axis('off')
+plt.tight_layout()
+plt.show()
+plt.close()
